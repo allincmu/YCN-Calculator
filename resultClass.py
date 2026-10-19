@@ -1,6 +1,6 @@
 from eventClass import Event
 from utils import which_ele_is_in_str, get_result_from_link, streamlit_or_print, get_comp_code_from_url
-
+from urllib.parse import urljoin
 
 class Result(Event):
     """
@@ -42,6 +42,7 @@ class Result(Event):
         debug_reject_headers=0,
         streamlit_mode=False,
         expander=None,
+        bce=False
     ):
         """
         Initialize the Result class.
@@ -60,11 +61,16 @@ class Result(Event):
         self.competition_name = competition_name
         self.o2cm_results_cache_dict = o2cm_results_cache_dict
         self.debug_reject_headers = debug_reject_headers
+        print("fesult", result)
         self.link = result.get("href")
+        URL = "https://ballroomcompexpress.com"
+        self.link = urljoin(URL, self.link[1:])
+        print(self.link)
         if self.link.startswith("http:"):
             self.link = "https:" + self.link[5:]
+        self.bce = bce
         super().__init__(result, debug_reject_headers, streamlit_mode, expander)
-        self.placement = int(self.raw_text.split(")")[0])
+        self.placement = int(self.raw_text.split(")"))
         self.dances_string = ", ".join(self.dances)
         self.comp_code = get_comp_code_from_url(self.link)
 
@@ -103,7 +109,7 @@ class Result(Event):
 
         # Click in to the event
         o2cm_result_info_dict, self.o2cm_results_cache_dict, is_new_result = (
-            get_result_from_link(self.link, self.o2cm_results_cache_dict)
+            get_result_from_link(self.link, self.o2cm_results_cache_dict, bce=self.bce)
         )
 
         # Add the number of rounds to the Result object, add whether the result was new or not
@@ -122,8 +128,12 @@ class Result(Event):
         for header_text in o2cm_result_info_dict["headers_text"]:
             dance = which_ele_is_in_str(dance_list, header_text)
             # Add jank becuase viennese waltz sometimes has a different name
-            if dance == "viennese waltz":
-                dances.append("v. waltz")
+            if dance == "viennese waltz" or dance == "v. waltz":
+                dances.append("vwaltz")
+            elif dance == "cha cha":
+                dances.append('chacha')
+            elif dance == "paso doble":
+                dances.append('pasodoble')
 
             elif dance:
                 dances.append(dance)

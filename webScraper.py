@@ -6,11 +6,107 @@ from datetime import date
 import json
 from utils import httpx_client, get_percent, streamlit_or_print
 import streamlit as st
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select
+import time
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 if __name__ == "__main__":
-    first_names = "first_names"
-    last_names = "last_names"
+    first_names = "austin"
+    last_names = "lin"
     streamlit = False
+    includeBCE = True
+
+def bce_get_acctid(name):
+    acctids = []
+    driver = webdriver.Firefox()
+    driver.implicitly_wait(3) # seconds
+    driver.get("https://ballroomcompexpress.com/results.php")
+    elem = driver.find_element(By.ID, "searchbar")
+    elem.clear()
+    elem.send_keys(name)
+    elem  = driver.find_elements(By.CLASS_NAME, "acctid")
+    for ele in elem:
+        acctids.append(ele.get_attribute("textContent"))
+    driver.close()
+    return acctids
+
+def bce_get_comps(acctids):
+    comps = {}
+    for aid in acctids:
+        comps[aid] = {}
+        driver = webdriver.Firefox()
+        driver.implicitly_wait(3) # seconds
+        driver.get(f"https://ballroomcompexpress.com/results.php?aid={aid}")
+        elems  = driver.find_elements(By.XPATH, "//*[starts-with(@id, 'cid')]")
+        for elem in elems:
+            # print(elem)
+            elem_split = elem.text.splitlines()
+
+            comp_name = elem_split[0]
+            comp_date = elem_split[1]
+            comp_cid = elem.get_attribute("id")[3:]
+
+            comps[aid][comp_cid] = {}
+            comps[aid][comp_cid]["cname"] = comp_name
+            comps[aid][comp_cid]["cdate"] = comp_date
+
+            # print(f"{comps[aid]["name"] = }
+            #         {comps[aid]["date"] = }
+            #         {comps[aid]["cid"] = }")
+
+        driver.close()
+
+    return comps
+
+def bce_get_results_from_comps(comps):
+    driver = webdriver.Firefox()
+    driver.implicitly_wait(3) # seconds
+    for aid in comps:
+        for comp in comps[aid]:
+            comps[aid][comp]["events"] = []
+            driver.get(f"https://ballroomcompexpress.com/results.php?aid={aid}&cid={comp}")
+            elems = driver.find_elements(By.CSS_SELECTOR, "div.event-entry a")
+            for elem in elems:
+                elementHTML = elem.get_attribute('outerHTML') #gives exact HTML content of the element
+                elementSoup = BeautifulSoup(elementHTML,'html.parser')
+                print(elementSoup)
+                comps[aid][comp]["events"].append(elementSoup.a)
+    driver.close()
+    return comps
+
+
+def scrape_bce(first_name, last_name, o2cm_results_cache_dict, debug_reject_headers, streamlit, expander):
+    name = f"{first_name} {last_name}"
+    acctids = bce_get_acctid(name)
+    comps = bce_get_comps(acctids)
+    res   = bce_get_results_from_comps(comps)
+
+    for aid in res:
+        for comp in res[aid]:
+            for event in res[aid][comp]["events"]:
+                item = event
+                date_object = res[aid][comp]["cdate"]
+                competition_name = res[aid][comp]["cname"]
+
+                top6_result = Result(
+                                    item,
+                                    first_name,
+                                    last_name,
+                                    date_object,
+                                    competition_name,
+                                    o2cm_results_cache_dict,
+                                    debug_reject_headers,
+                                    streamlit_mode=streamlit,
+                                    expander=expander,
+                                    bce=True
+                                )
+
+
+
 
 
 def webScraper(
@@ -26,7 +122,9 @@ def webScraper(
     comp_codes_to_exclude=[
         "bbj",
         "hbi",
+        "bam"
     ],  # Exclude comps judged by amateurs (bbj is Bam Jam, hbi is Harvard Beginners)
+    includeBCE=False
 ):
     """
     Scrapes https://results.o2cm.com/ given someone's name.
@@ -52,141 +150,141 @@ def webScraper(
             "waltz": [0, 0],
             "tango": [0, 0],
             "foxtrot": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
         },
         "bronze": {
             "waltz": [0, 0],
             "tango": [0, 0],
             "foxtrot": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
         },
         "silver": {
             "waltz": [0, 0],
             "tango": [0, 0],
             "foxtrot": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
         },
         "gold": {
             "waltz": [0, 0],
             "tango": [0, 0],
             "foxtrot": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
         },
         "novice": {
             "waltz": [0, 0],
             "tango": [0, 0],
             "foxtrot": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
         },
         "pre-champ": {
             "waltz": [0, 0],
             "tango": [0, 0],
             "foxtrot": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
         },
         "champ": {
             "waltz": [0, 0],
             "tango": [0, 0],
             "foxtrot": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
         },
     }
     standard_data = {
         "newcomer": {
             "waltz": [0, 0],
             "tango": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
             "foxtrot": [0, 0],
             "quickstep": [0, 0],
         },
         "bronze": {
             "waltz": [0, 0],
             "tango": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
             "foxtrot": [0, 0],
             "quickstep": [0, 0],
         },
         "silver": {
             "waltz": [0, 0],
             "tango": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
             "foxtrot": [0, 0],
             "quickstep": [0, 0],
         },
         "gold": {
             "waltz": [0, 0],
             "tango": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
             "foxtrot": [0, 0],
             "quickstep": [0, 0],
         },
         "novice": {
             "waltz": [0, 0],
             "tango": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
             "foxtrot": [0, 0],
             "quickstep": [0, 0],
         },
         "pre-champ": {
             "waltz": [0, 0],
             "tango": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
             "foxtrot": [0, 0],
             "quickstep": [0, 0],
         },
         "champ": {
             "waltz": [0, 0],
             "tango": [0, 0],
-            "v. waltz": [0, 0],
+            "vwaltz": [0, 0],
             "foxtrot": [0, 0],
             "quickstep": [0, 0],
         },
     }
     rhythm_data = {
         "newcomer": {
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
             "swing": [0, 0],
             "bolero": [0, 0],
             "mambo": [0, 0],
         },
         "bronze": {
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
             "swing": [0, 0],
             "bolero": [0, 0],
             "mambo": [0, 0],
         },
         "silver": {
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
             "swing": [0, 0],
             "bolero": [0, 0],
             "mambo": [0, 0],
         },
         "gold": {
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
             "swing": [0, 0],
             "bolero": [0, 0],
             "mambo": [0, 0],
         },
         "novice": {
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
             "swing": [0, 0],
             "bolero": [0, 0],
             "mambo": [0, 0],
         },
         "pre-champ": {
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
             "swing": [0, 0],
             "bolero": [0, 0],
             "mambo": [0, 0],
         },
         "champ": {
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
             "swing": [0, 0],
             "bolero": [0, 0],
@@ -196,51 +294,51 @@ def webScraper(
     latin_data = {
         "newcomer": {
             "samba": [0, 0],
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
-            "paso doble": [0, 0],
+            "pasodoble": [0, 0],
             "jive": [0, 0],
         },
         "bronze": {
             "samba": [0, 0],
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
-            "paso doble": [0, 0],
+            "pasodoble": [0, 0],
             "jive": [0, 0],
         },
         "silver": {
             "samba": [0, 0],
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
-            "paso doble": [0, 0],
+            "pasodoble": [0, 0],
             "jive": [0, 0],
         },
         "gold": {
             "samba": [0, 0],
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
-            "paso doble": [0, 0],
+            "pasodoble": [0, 0],
             "jive": [0, 0],
         },
         "novice": {
             "samba": [0, 0],
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
-            "paso doble": [0, 0],
+            "pasodoble": [0, 0],
             "jive": [0, 0],
         },
         "pre-champ": {
             "samba": [0, 0],
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
-            "paso doble": [0, 0],
+            "pasodoble": [0, 0],
             "jive": [0, 0],
         },
         "champ": {
             "samba": [0, 0],
-            "cha cha": [0, 0],
+            "chacha": [0, 0],
             "rumba": [0, 0],
-            "paso doble": [0, 0],
+            "pasodoble": [0, 0],
             "jive": [0, 0],
         },
     }
@@ -274,6 +372,9 @@ def webScraper(
             expander.write(text)
         elif not streamlit and show_work:
             print("\n", text, "\n")
+
+        if includeBCE:
+            scrape_bce(first_name, last_name, o2cm_results_cache_dict, debug_reject_headers, streamlit, expander)
 
         response = httpx_client().get(
             f"https://results.o2cm.com/individual.asp?szLast={last_name}&szFirst={first_name}"
@@ -349,8 +450,8 @@ def webScraper(
                     if result.style and result.level and dance:
                         # Events with level "syllabus" count for bronze points
                         if result.level == "syllabus":
-                            level = "bronze"
-                        # Events with level "open" count for pre-champ points
+                            level = "gold"
+                        # Events with level "open" count for prechamp points
                         elif result.level == "open":
                             level = "pre-champ"
                         else:
@@ -438,8 +539,8 @@ def webScraper(
         ]
 
     # Row labels
-    smooth_df.index = ["Waltz", "Tango", "Foxtrot", "V. Waltz"]
-    standard_df.index = ["Waltz", "Tango", "V. Waltz", "Foxtrot", "Quickstep"]
+    smooth_df.index = ["Waltz", "Tango", "Foxtrot", "VWaltz"]
+    standard_df.index = ["Waltz", "Tango", "VWaltz", "Foxtrot", "Quickstep"]
     rhythm_df.index = ["Cha cha", "Rumba", "Swing", "Bolero", "Mambo"]
     latin_df.index = ["Samba", "Cha cha", "Rumba", "Paso Doble", "Jive"]
 
@@ -492,7 +593,7 @@ def webScraper(
 
 # For testing
 if __name__ == "__main__":
-    output = webScraper(first_names, last_names, streamlit=streamlit)
+    output = webScraper(first_names, last_names, streamlit=streamlit, includeBCE=includeBCE)
 
     for line in output:
         print()

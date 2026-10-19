@@ -211,7 +211,7 @@ def get_most_recent_comp_year(comp_code):
 
 
 def get_result_from_link(
-    link, o2cm_results_cache_dict, max_links=100000, show_work=False
+    link, o2cm_results_cache_dict, max_links=100000, show_work=False, bce=False
 ):
     """
     Retrieve the result response_text from a given link. If the link has been visited before,
@@ -226,10 +226,11 @@ def get_result_from_link(
     Returns:
         tuple: A tuple containing the retrieved data and the updated cache dictionary and whether the result was new.
     """
+    print(link)
     is_new_result = False
     if link not in o2cm_results_cache_dict:
         response_text = httpx_client().get(link).text
-        o2cm_result_info_dict = get_info_from_o2cm_results(response_text)
+        o2cm_result_info_dict = get_info_from_o2cm_results(response_text, bce)
         o2cm_results_cache_dict[link] = o2cm_result_info_dict
         is_new_result = True
     else:
@@ -246,7 +247,7 @@ def get_result_from_link(
     return o2cm_result_info_dict, o2cm_results_cache_dict, is_new_result
 
 
-def get_info_from_o2cm_results(html):
+def get_info_from_o2cm_results(html, bce = False):
     """
     Extracts information from the O2CM results HTML.
 
@@ -260,6 +261,7 @@ def get_info_from_o2cm_results(html):
             - headers_text (list): A list of header texts.
     """
     soup = BeautifulSoup(html, "html.parser")
+    print(soup.prettify())
 
     # Get num_rounds
     select_element = soup.select_one("select")
@@ -276,7 +278,10 @@ def get_info_from_o2cm_results(html):
     headers_text = [header.text.lower() for header in headers]
 
     # Get competition_name
-    competition_name = soup.select_one(".h1").text.strip()
+    if not bce:
+        competition_name = soup.select_one(".h1").text.strip()
+    else:
+        competition_name = soup.select_one("h1").text.strip()
 
     return {
         "num_rounds": num_rounds,
